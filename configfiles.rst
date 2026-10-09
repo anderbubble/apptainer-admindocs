@@ -1349,3 +1349,106 @@ from ``docker.io``:
 
 Users may also put the configuration in their own
 ``$HOME/.config/containers/registries.conf`` instead.
+
+.. _log_plugin:
+
+************************
+ Log plugin config.yml
+************************
+
+The log plugin writes a syslog entry for every ``{command}`` command,
+except ``{command} plugin ...`` commands. Each entry is written before
+the command runs, so failed and rejected commands are logged too. It
+was ported from the SingularityCE log plugin, and SingularityCE
+configuration and template files work with it unchanged (see
+:ref:`Migrating the SingularityCE log plugin <log_plugin_migration>`).
+
+The plugin is not part of a default {Project} build. It needs
+{aProject} binary built with plugin support from the same source tree
+and Go toolchain as the plugin. RPMs built with ``rpmbuild --with
+plugins`` include an ``{command}-log-plugin`` package that installs
+and registers the plugin. For source installations, see
+``log-plugin/README.md`` in the {Project} source.
+
+The plugin reads ``config.yml`` from the
+``plugins/{command}.org/log-plugin`` subdirectory of the configuration
+directory, e.g. ``/etc/{command}/plugins/{command}.org/log-plugin/``.
+The file lists one or more outputs:
+
+.. code:: yaml
+
+   output:
+   - name: System logger
+     type: syslog
+     tag: {command}
+     facility: user
+     template: default.tpl
+
+Each output has these keys:
+
+``name``: A name for the output, used in warning messages.
+
+``type``: The output type. Only ``syslog`` is supported.
+
+``template``: A Go ``text/template`` file that formats the message,
+given as a path relative to the configuration directory.
+
+``tag``: The syslog tag that messages are logged under. Optional;
+defaults to ``{command}``.
+
+``facility``: The syslog facility, given by its standard name, such as
+``user``, ``daemon``, ``auth``, ``authpriv``, or ``local0`` to
+``local7``. Optional; defaults to ``user``. Since templates can log
+command arguments and environment variables, sites may prefer
+``authpriv``, which on RHEL-family systems goes to the root-only
+``/var/log/secure``, or a ``local*`` facility to route these messages
+to a file or SIEM of their own.
+
+Each output writes one message per command at severity ``notice``.
+Nothing is written if the template output is empty. Problems with the
+configuration, such as a missing file, bad YAML, a bad template or an
+unknown facility, only print a warning, even with ``--quiet`` or
+``--silent``, and skip the affected output; they never stop the command
+from running.
+
+The package installs two example templates: ``default.tpl``, and
+``mpi-rank0-only.tpl``, which only logs from rank 0 of an Open MPI or
+PMI job. Templates can use these fields:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Field
+     - Meaning
+   * - ``.UID``, ``.GID``
+     - Numeric IDs of the invoking user
+   * - ``.User``, ``.Group``
+     - User and group names (``UNKNOWN`` if lookup fails)
+   * - ``.Executable``
+     - Absolute path of the ``{command}`` binary
+   * - ``.Version``
+     - {Project} version
+   * - ``.CWD``
+     - Working directory
+   * - ``.Command``
+     - Command name (``run``, ``exec``, ``build``, ...)
+   * - ``.Args``
+     - Positional arguments
+   * - ``.Flags``
+     - Flags set on the command line, as ``name="value"``; flags set
+       through ``{ENVPREFIX}_*`` environment variables appear only in
+       ``.Env``
+   * - ``.Image``
+     - Image path (absolute) or URI, for action and instance commands
+   * - ``.SIFUUID``
+     - SIF UUID for local SIF images, otherwise empty
+   * - ``.Env``
+     - Map of all environment variables, e.g. ``.Env.LOGNAME``
+
+Environment variables that are not set render as empty strings.
+
+With ``default.tpl``, a message looks like this:
+
+.. code:: text
+
+   {command}[2505827]: uid=1000 gid=1000 user="alice" group="alice" exe="/usr/bin/{command}" version="{InstallationVersion}" cwd="/home/alice" command="run" args=["alpine.sif"] flags=[] image="/home/alice/alpine.sif" sif-uuid="46bff61b-7129-4707-9d54-c36c7fb09c04" LOGNAME="alice"

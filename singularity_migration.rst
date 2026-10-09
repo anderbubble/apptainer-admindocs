@@ -74,3 +74,66 @@ migration to {Project} will impact users.
 In particular the system administrator may want to 
 :ref:`restore pre-Apptainer library behavior <no_default_remote>`
 for all users.
+
+.. _log_plugin_migration:
+
+****************************************
+ Migrating the SingularityCE log plugin
+****************************************
+
+{Project} provides a port of the SingularityCE log plugin (see
+:ref:`Log plugin config.yml <log_plugin>`). Its configuration and
+template files work unchanged, but some details differ:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Item
+     - SingularityCE
+     - {Project}
+   * - Syslog tag
+     - The invoked command name, e.g. ``singularity[pid]`` or
+       ``/usr/bin/singularity[pid]``
+     - ``{command}[pid]`` by default; set per output with ``tag``
+   * - Syslog facility
+     - ``kern`` (none set)
+     - ``user`` by default; set per output with ``facility``
+   * - Plugin name
+     - ``sylabs.io/log-plugin``
+     - ``{command}.org/log-plugin``
+   * - Package name
+     - ``singularity-ce-log-plugin``
+     - ``{command}-log-plugin``
+   * - Configuration directory
+     - ``/etc/singularity/plugins/sylabs.io/log-plugin/``
+     - ``/etc/{command}/plugins/{command}.org/log-plugin/``
+   * - ``.Executable``
+     - ``/usr/bin/singularity``
+     - ``/usr/bin/{command}``
+   * - ``.Version``
+     - ``4.x``
+     - The {Project} version
+   * - ``.Flags`` names
+     - SingularityCE command line
+     - {Project} command line (mostly the same; ``--oci`` and other
+       SingularityCE-only flags are absent)
+   * - Environment variables
+     - ``SINGULARITY_*``
+     - ``{ENVPREFIX}_*``; ``SINGULARITY_*`` are still accepted, so
+       templates that log ``.Env.SINGULARITY_*`` should also log the
+       ``{ENVPREFIX}_*`` names
+
+To migrate:
+
+#. Copy ``config.yml`` and the ``*.tpl`` files from
+   ``/etc/singularity/plugins/sylabs.io/log-plugin/`` to
+   ``/etc/{command}/plugins/{command}.org/log-plugin/``.
+
+#. Update log parsing and SIEM rules for the tag, facility,
+   executable and version changes listed above. To keep rules that
+   match on the tag, set ``tag: singularity`` on each output. Rules
+   that select these messages by the ``kern`` facility need to change
+   to the configured facility.
+
+#. Check any template that logs ``.Flags`` against the {Project} flag
+   names.
