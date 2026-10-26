@@ -60,28 +60,27 @@ there is no need to perform any configuration migration.
 ``trusted bind paths`` directive. {Project} silently ignores directives
 it does not know, so a configuration with ``trusted bind paths = yes``
 would lose that setting, and its bind paths would be mounted ``nosuid``
-and ``nodev``. Instead, {Project} sets these mount options per path on
-the ``bind path`` entries themselves (see :ref:`Bind Mount Management
-<bind_mount_management>`). ``{command} confgen``, which the RPM upgrade
-uses to import an old configuration, prints a warning when it finds
+and ``nodev``. Instead, {Project} can allow device access per path with
+a ``dev`` option on the ``bind path`` entries themselves (see
+:ref:`Bind Mount Management <bind_mount_management>`).
+``{command} confgen``, which the RPM upgrade uses to import an old
+configuration, prints a warning when it finds
 ``trusted bind paths = yes``.
 
-The exact equivalent is to add ``:dev,suid`` to each ``bind path``
-entry. It is better to add only the option each path actually needs.
-That is usually ``dev`` alone, since unprivileged users get nothing from
-``suid``.
+Add ``:dev`` to each ``bind path`` entry that needs device access.
+Unlike ``trusted bind paths``, this keeps ``nosuid`` on the bind. That
+only matters for the root user, who can still allow setuid binaries with
+``--allow-setuid``; unprivileged users can't run them either way, because
+{Project} always sets ``PR_SET_NO_NEW_PRIVS`` for them.
 
 .. list-table::
    :header-rows: 1
 
    * - SingularityCE / SingularityPRO
-     - {Project}, exact equivalent
-     - {Project}, recommended
+     - {Project}
    * - ``trusted bind paths = yes`` and ``bind path = /opt/tools``
-     - ``bind path = /opt/tools::dev,suid``
      - ``bind path = /opt/tools::dev``
    * - ``trusted bind paths = yes`` and ``bind path = /scratch``
-     - ``bind path = /scratch::dev,suid``
      - ``bind path = /scratch`` (if it doesn't need devices)
 
 However, a big change from Singularity is that {Project} does not
